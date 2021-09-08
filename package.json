@@ -1,0 +1,28 @@
+{
+  "name": "com.srejonkhan.filecachingsystem",
+  "version": "0.0.1",
+  "displayName": "File Caching System",
+  "description": "File Caching System for Unity, to reduce bandwidth ",
+  "unity": "2019.1",
+  "unityRelease": "0b5",
+  "documentationUrl": "https://github.com/SrejonKhan/FileCachingSystem/",
+  "changelogUrl": "https://github.com/SrejonKhan/FileCachingSystem/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/SrejonKhan/FileCachingSystem/blob/main/LICENCE.md",
+  "keywords": [
+    "File Caching System",
+    "Cache",
+    "Multiplayer",
+    "File Integrity",
+    "Download",
+    "Upload"
+  ],
+  "author": {
+    "name": "Srejon Khan",
+    "email": "srejonkhan9@gmail.com",
+    "url": "https://srejonkhan.github.io"
+  },
+  "type": "library",
+  "dependencies": {
+		"com.unity.nuget.newtonsoft-json": "1.1.2"
+	}
+}
