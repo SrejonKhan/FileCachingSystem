@@ -2,7 +2,7 @@
   "name": "com.srejonkhan.filecachingsystem",
   "version": "0.0.1",
   "displayName": "File Caching System",
-  "description": "File Caching System for Unity, to reduce bandwidth ",
+  "description": "File Caching System for Unity.",
   "unity": "2019.1",
   "unityRelease": "0b5",
   "documentationUrl": "https://github.com/SrejonKhan/FileCachingSystem/",
@@ -23,6 +23,6 @@
   },
   "type": "library",
   "dependencies": {
-		"com.unity.nuget.newtonsoft-json": "1.1.2"
-	}
+    "com.unity.nuget.newtonsoft-json": "1.1.2"
+  }
 }
