@@ -16,11 +16,34 @@ namespace FileCachingSystem
                 // FSTR (File Start) 
                 // FEND (File End)
 
-                if (TryReadChunk(fileStream, out var cacheChunk))
+
+                byte[] fileStartChunkBuffer = new byte[4];
+                fileStream.Read(fileStartChunkBuffer, 0, 4);
+
+                string fileStartChunk = Encoding.ASCII.GetString(fileStartChunkBuffer);
+
+                if (fileStartChunk != "FSTR")
                 {
-                    Debug.Log(cacheChunk.GetID());    
-                    Debug.Log(cacheChunk.GetRef());    
-                    Debug.Log(cacheChunk.GetHash());    
+                    throw new InvalidDataException("File doesn't contain Start Chunk, which mean it's a corrupted cache file.");
+                }
+
+                bool endOfFile = false;
+
+                while (!endOfFile)
+                {
+                    if (TryReadChunk(fileStream, out var cacheChunk))
+                    {
+                        if (!cacheChunk.encounteredEndOfFile)
+                        {
+                            Debug.Log(cacheChunk.GetID());
+                            Debug.Log(cacheChunk.GetRef());
+                            Debug.Log(cacheChunk.GetHash());
+                        }
+                        else
+                        {
+                            endOfFile = true;
+                        }
+                    }
                 }
             }
 
@@ -36,8 +59,13 @@ namespace FileCachingSystem
             byte[] startChunkBuffer = new byte[4];
             fileStream.Read(startChunkBuffer, 0, 4);
             string startChunk = Encoding.ASCII.GetString(startChunkBuffer);
-            if (startChunk != "STRT")
+            if (startChunk != "CSTR")
             {
+                if (startChunk == "FEND")
+                {
+                    chunkGroup.encounteredEndOfFile = true;
+                    return true;
+                }
                 return false;
             }
 
@@ -92,10 +120,14 @@ namespace FileCachingSystem
 
         public static void WriteCache()
         {
+            FileStream fileStream = null;
+            if (File.Exists("E://cache.fcs"))
+                fileStream = File.OpenRead("E://cache.fcs"); ;
+            
             /*______________THIS IS FOR TEST ONLY_____________*/
-            string id = "-MswQsa2hOp";
+            string id = "-MswQsa2hOp1dsa2";
             string reference = "https://example.com/httmp.jpeg";
-            string hash = "hsWWQagoasWgas-";
+            string hash = "hsWWQagof21asW31gas-";
             byte[] dataBuffer = new byte[]
             {
             0x30, 0x32, 0x32, 0x32, 0xe7, 0x30, 0xaa, 0x7f, 0x32, 0x32, 0x32, 0x32, 0xf9, 0x40, 0xbc, 0x7f,
@@ -110,31 +142,43 @@ namespace FileCachingSystem
 
             using (MemoryStream memoryStream = new MemoryStream())
             {
-                byte[] startChunkBuffer = Encoding.ASCII.GetBytes("STRT");
+                if (fileStream != null)
+                {
+                    byte[] existingFileBuffer = new byte[fileStream.Length - 4];
+                    fileStream.Read(existingFileBuffer, 0, existingFileBuffer.Length);
+                    memoryStream.Write(existingFileBuffer, 0, existingFileBuffer.Length);
+                    fileStream.Close();
+                    fileStream.Dispose();
+                }
+                else
+                {
+                    // new file should have file start chunk
+                    byte[] fileStartChunkBuffer = Encoding.ASCII.GetBytes("FSTR");
+                    memoryStream.Write(fileStartChunkBuffer, 0, fileStartChunkBuffer.Length);
+                }
+
+                
+                byte[] startChunkBuffer = Encoding.ASCII.GetBytes("CSTR");
 
                 byte[] idBuffer = Encoding.ASCII.GetBytes(id);
-
-                uint idLength = (uint)idBuffer.Length;
-                byte[] idLengthBuffer = BitConverter.GetBytes(idLength);
+                byte[] idLengthBuffer = BitConverter.GetBytes((uint)idBuffer.Length);
 
                 byte[] refBuffer = Encoding.ASCII.GetBytes(reference);
-                uint refLength = (uint)refBuffer.Length;
-                byte[] refLengthBuffer = BitConverter.GetBytes(refLength);
+                byte[] refLengthBuffer = BitConverter.GetBytes((uint)refBuffer.Length);
 
                 byte[] hashBuffer = Encoding.ASCII.GetBytes(hash);
-                uint hashLength = (uint)hashBuffer.Length;
-                byte[] hashLengthBuffer = BitConverter.GetBytes(hashLength);
+                byte[] hashLengthBuffer = BitConverter.GetBytes((uint)hashBuffer.Length);
 
-                uint dataLength = (uint)dataBuffer.Length;
-                byte[] dataLengthBuffer = BitConverter.GetBytes(dataLength);
+                byte[] dataLengthBuffer = BitConverter.GetBytes((uint)dataBuffer.Length);
 
                 byte[] endChunkBuffer = Encoding.ASCII.GetBytes("CEND");
+                byte[] fileEndChunkBuffer = Encoding.ASCII.GetBytes("FEND");
 
                 /*_______________ Wrting to Memory Steaming_____________*/
                 // STRT
                 memoryStream.Write(startChunkBuffer, 0, startChunkBuffer.Length);
                 // IDLT, IDST Chunks
-                memoryStream.Write(idLengthBuffer, 0, idLengthBuffer.Length);
+                memoryStream.Write(idLengthBuffer, 0, idLengthBuffer. Length);
                 memoryStream.Write(idBuffer, 0, idBuffer.Length);
                 // RFLT
                 memoryStream.Write(refLengthBuffer, 0, refLengthBuffer.Length);
@@ -153,6 +197,9 @@ namespace FileCachingSystem
                 // CEND 
                 memoryStream.Write(endChunkBuffer, 0, endChunkBuffer.Length);
 
+                // FEND
+                memoryStream.Write(fileEndChunkBuffer, 0, fileEndChunkBuffer.Length);
+
                 // Hard Saving for Test only
                 File.WriteAllBytes("E://cache.fcs", memoryStream.ToArray());
             }
@@ -167,6 +214,9 @@ namespace FileCachingSystem
         public uint dataLength;
         public byte[] trioChunksBuffer;
 
+        public bool encounteredEndOfFile;
+        
+            
         public string GetID()
         {
             return id;
