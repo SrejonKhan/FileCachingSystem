@@ -17,15 +17,9 @@ namespace FileCachingSystem
                 // FEND (File End)
 
 
-                byte[] fileStartChunkBuffer = new byte[4];
-                fileStream.Read(fileStartChunkBuffer, 0, 4);
+                CacheFileHeader fileHeader = FileCacherHelper.GetFileHeader(fileStream);
 
-                string fileStartChunk = Encoding.ASCII.GetString(fileStartChunkBuffer);
-
-                if (fileStartChunk != "FSTR")
-                {
-                    throw new InvalidDataException("File doesn't contain Start Chunk, which mean it's a corrupted cache file.");
-                }
+                Debug.Log(fileHeader.totalCachedFile);
 
                 bool endOfFile = false;
 
@@ -38,6 +32,10 @@ namespace FileCachingSystem
                             Debug.Log(cacheChunk.GetID());
                             Debug.Log(cacheChunk.GetRef());
                             Debug.Log(cacheChunk.GetHash());
+                            Texture2D tex = new Texture2D(1, 1);
+                            tex.LoadRawTextureData(cacheChunk.GetData());
+                            tex.Apply();
+                            File.WriteAllBytes($"E:/output/{UnityEngine.Random.Range(0,10000)}.png", tex.EncodeToPNG());
                         }
                         else
                         {
@@ -56,12 +54,14 @@ namespace FileCachingSystem
             // Try Read Cached File's Chunk
             // Cached File Chunks -
 
-            byte[] startChunkBuffer = new byte[4];
-            fileStream.Read(startChunkBuffer, 0, 4);
-            string startChunk = Encoding.ASCII.GetString(startChunkBuffer);
-            if (startChunk != "CSTR")
+            byte[] chunkNameBuffer = new byte[4];
+            fileStream.Read(chunkNameBuffer, 0, 4);
+            string chunkName = Encoding.ASCII.GetString(chunkNameBuffer);
+            chunkGroup.chunkName = chunkName;
+
+            if (chunkName != "CSTR")
             {
-                if (startChunk == "FEND")
+                if (chunkName == "FEND")
                 {
                     chunkGroup.encounteredEndOfFile = true;
                     return true;
@@ -142,27 +142,15 @@ namespace FileCachingSystem
 
             using (MemoryStream memoryStream = new MemoryStream())
             {
-                if (fileStream != null)
-                {
-                    byte[] existingFileBuffer = new byte[fileStream.Length - 4];
-                    fileStream.Read(existingFileBuffer, 0, existingFileBuffer.Length);
-                    memoryStream.Write(existingFileBuffer, 0, existingFileBuffer.Length);
-                    fileStream.Close();
-                    fileStream.Dispose();
-                }
-                else
-                {
-                    // new file should have file start chunk
-                    byte[] fileStartChunkBuffer = Encoding.ASCII.GetBytes("FSTR");
-                    memoryStream.Write(fileStartChunkBuffer, 0, fileStartChunkBuffer.Length);
-                }
+                /*_______________ File Header _____________*/
+                byte[] fileHeaderBuffer =  FileCacherHelper.ValidateFileHeader(fileStream);
+                memoryStream.Write(fileHeaderBuffer, 0, fileHeaderBuffer.Length);
 
-                
+                /*_______________ Creating Buffers _____________*/
                 byte[] startChunkBuffer = Encoding.ASCII.GetBytes("CSTR");
 
                 byte[] idBuffer = Encoding.ASCII.GetBytes(id);
                 byte[] idLengthBuffer = BitConverter.GetBytes((uint)idBuffer.Length);
-
                 byte[] refBuffer = Encoding.ASCII.GetBytes(reference);
                 byte[] refLengthBuffer = BitConverter.GetBytes((uint)refBuffer.Length);
 
@@ -175,9 +163,9 @@ namespace FileCachingSystem
                 byte[] fileEndChunkBuffer = Encoding.ASCII.GetBytes("FEND");
 
                 /*_______________ Wrting to Memory Steaming_____________*/
-                // STRT
+                // CSTR
                 memoryStream.Write(startChunkBuffer, 0, startChunkBuffer.Length);
-                // IDLT, IDST Chunks
+                // IDLT, IDST Chunks 
                 memoryStream.Write(idLengthBuffer, 0, idLengthBuffer. Length);
                 memoryStream.Write(idBuffer, 0, idBuffer.Length);
                 // RFLT
@@ -205,44 +193,4 @@ namespace FileCachingSystem
             }
         }
     }
-
-    public class CacheChunkGroup
-    {
-        public string id;
-        public uint refLength;
-        public uint hashLength;
-        public uint dataLength;
-        public byte[] trioChunksBuffer;
-
-        public bool encounteredEndOfFile;
-        
-            
-        public string GetID()
-        {
-            return id;
-        }
-        public string GetRef()
-        {
-            byte[] refBuffer = new byte[refLength];
-            Buffer.BlockCopy(trioChunksBuffer, 0, refBuffer, 0, (int)refLength);
-            return Encoding.ASCII.GetString(refBuffer);
-        }
-
-        public string GetHash()
-        {
-            byte[] hashBuffer = new byte[hashLength];
-            int offset = (int)refLength;
-            Buffer.BlockCopy(trioChunksBuffer, offset, hashBuffer, 0, (int)hashLength);
-            return Encoding.ASCII.GetString(hashBuffer);
-        }
-
-        public byte[] GetData()
-        {
-            byte[] dataBuffer = new byte[dataLength];
-            int offset = (int)refLength;
-            Buffer.BlockCopy(trioChunksBuffer, offset, dataBuffer, 0, (int)dataLength);
-            return dataBuffer;
-        }
-    }
-
 }
