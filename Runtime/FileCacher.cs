@@ -35,7 +35,7 @@ namespace FileCachingSystem
                             Texture2D tex = new Texture2D(1, 1);
                             tex.LoadRawTextureData(cacheChunk.GetData());
                             tex.Apply();
-                            File.WriteAllBytes($"E:/output/{UnityEngine.Random.Range(0,10000)}.png", tex.EncodeToPNG());
+                            File.WriteAllBytes($"E:/output/{UnityEngine.Random.Range(0, 10000)}.png", tex.EncodeToPNG());
                         }
                         else
                         {
@@ -47,25 +47,33 @@ namespace FileCachingSystem
 
         }
 
+        /// <summary>
+        /// Try Read Cached File's Single Chunk
+        /// </summary>
+        /// <param name="fileStream"></param>
+        /// <param name="chunkGroup"></param>
+        /// <returns></returns>
         public static bool TryReadChunk(FileStream fileStream, out CacheChunkGroup chunkGroup)
         {
             chunkGroup = new CacheChunkGroup();
 
-            // Try Read Cached File's Chunk
-            // Cached File Chunks -
-
+            // check if we met the end of fille
+            if (fileStream.Position == fileStream.Length)
+            {
+                chunkGroup.encounteredEndOfFile = true;
+                return true;
+            }
+            
+            // chunk name
             byte[] chunkNameBuffer = new byte[4];
+
             fileStream.Read(chunkNameBuffer, 0, 4);
             string chunkName = Encoding.ASCII.GetString(chunkNameBuffer);
             chunkGroup.chunkName = chunkName;
 
+            // check if it's start of a chunk
             if (chunkName != "CSTR")
             {
-                if (chunkName == "FEND")
-                {
-                    chunkGroup.encounteredEndOfFile = true;
-                    return true;
-                }
                 return false;
             }
 
@@ -118,33 +126,30 @@ namespace FileCachingSystem
             }
         }
 
-        public static void WriteCache()
+        public static void WriteCache(string path, string id, string reference, string hash, byte[] dataBuffer)
         {
             FileStream fileStream = null;
-            if (File.Exists("E://cache.fcs"))
-                fileStream = File.OpenRead("E://cache.fcs"); ;
-            
-            /*______________THIS IS FOR TEST ONLY_____________*/
-            string id = "-MswQsa2hOp1dsa2";
-            string reference = "https://example.com/httmp.jpeg";
-            string hash = "hsWWQagof21asW31gas-";
-            byte[] dataBuffer = new byte[]
+            bool freshCache = !File.Exists(path); // if new created cache
+
+            /*_______________ File Header _____________*/
+            byte[] fileHeaderBuffer = FileCacherHelper.ValidateFileHeader(path, freshCache);
+
+            // Append to existing file
+            if (!freshCache)
             {
-            0x30, 0x32, 0x32, 0x32, 0xe7, 0x30, 0xaa, 0x7f, 0x32, 0x32, 0x32, 0x32, 0xf9, 0x40, 0xbc, 0x7f,
-            0x03, 0x03, 0x03, 0x03, 0xf6, 0x30, 0x02, 0x05, 0x03, 0x03, 0x03, 0x03, 0xf4, 0x30, 0x03, 0x06,
-            0x32, 0x32, 0x32, 0x32, 0xf7, 0x40, 0xaa, 0x7f, 0x32, 0xf2, 0x02, 0xa8, 0xe7, 0x30, 0xff, 0xff,
-            0x03, 0x03, 0x03, 0xff, 0xe6, 0x40, 0x00, 0x0f, 0x00, 0xff, 0x00, 0xaa, 0xe9, 0x40, 0x9f, 0xff,
-            0x5b, 0x03, 0x03, 0x03, 0xca, 0x6a, 0x0f, 0x30, 0x03, 0x03, 0x03, 0xff, 0xca, 0x68, 0x0f, 0x30,
-            0xaa, 0x94, 0x90, 0x40, 0xba, 0x5b, 0xaf, 0x68, 0x40, 0x00, 0x00, 0xff, 0xca, 0x58, 0x0f, 0x20,
-            0x00, 0x00, 0x00, 0xff, 0xe6, 0x40, 0x01, 0x2c, 0x00, 0xff, 0x00, 0xaa, 0xdb, 0x41, 0xff, 0xff,
-            0x00, 0x00, 0x00, 0xff, 0xe8, 0x40, 0x01, 0x1c, 0x00, 0xff, 0x00, 0xaa, 0xbb, 0x40, 0xff, 0xff,
-            };
+                fileStream = new FileStream(path, FileMode.Append);  
+            }
+            // Create new file
+            else
+            {
+                fileStream = File.Create(path);
+            }
 
             using (MemoryStream memoryStream = new MemoryStream())
             {
-                /*_______________ File Header _____________*/
-                byte[] fileHeaderBuffer =  FileCacherHelper.ValidateFileHeader(fileStream);
-                memoryStream.Write(fileHeaderBuffer, 0, fileHeaderBuffer.Length);
+                // writing Header to fresh file
+                if (freshCache)
+                    memoryStream.Write(fileHeaderBuffer, 0, fileHeaderBuffer.Length);
 
                 /*_______________ Creating Buffers _____________*/
                 byte[] startChunkBuffer = Encoding.ASCII.GetBytes("CSTR");
@@ -166,7 +171,7 @@ namespace FileCachingSystem
                 // CSTR
                 memoryStream.Write(startChunkBuffer, 0, startChunkBuffer.Length);
                 // IDLT, IDST Chunks 
-                memoryStream.Write(idLengthBuffer, 0, idLengthBuffer. Length);
+                memoryStream.Write(idLengthBuffer, 0, idLengthBuffer.Length);
                 memoryStream.Write(idBuffer, 0, idBuffer.Length);
                 // RFLT
                 memoryStream.Write(refLengthBuffer, 0, refLengthBuffer.Length);
@@ -188,8 +193,12 @@ namespace FileCachingSystem
                 // FEND
                 memoryStream.Write(fileEndChunkBuffer, 0, fileEndChunkBuffer.Length);
 
-                // Hard Saving for Test only
-                File.WriteAllBytes("E://cache.fcs", memoryStream.ToArray());
+                /*_______________ Persistency _____________*/
+                // appending to old file
+                fileStream.Write(memoryStream.ToArray(), 0, (int)memoryStream.Length);
+                // close and dispose
+                fileStream.Close();
+                fileStream.Dispose();
             }
         }
     }

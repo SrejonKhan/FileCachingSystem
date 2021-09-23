@@ -6,23 +6,25 @@ namespace FileCachingSystem
 {
     public class FileCacherHelper
     {
-        public static byte[] ValidateFileHeader(FileStream fileStream)
+        public static byte[] ValidateFileHeader(string path, bool freshCache)
         {
             using (MemoryStream memoryStream = new MemoryStream())
             {
-                if (fileStream != null)
+                // update cache file count in existing file
+                if (!freshCache)
                 {
+                    FileStream fileStream = new FileStream(path, FileMode.Open);
                     CacheFileHeader fileHeader = GetFileHeader(fileStream);
 
-                    memoryStream.Write(fileHeader.buffer, 0, 8); // file header
-                    memoryStream.Write(GetBuffer(fileHeader.totalCachedFile + 1), 0, 4); // cached files length
+                    byte[] countBuffer = GetBuffer(fileHeader.totalCachedFile + 1);
 
-                    byte[] existingFileBuffer = new byte[fileStream.Length-16];
-                    fileStream.Read(existingFileBuffer, 0, existingFileBuffer.Length);
-                    memoryStream.Write(existingFileBuffer, 0, existingFileBuffer.Length);
+                    fileStream.Seek(8, SeekOrigin.Begin);
+                    fileStream.Write(countBuffer, 0, 4);
+
                     fileStream.Close();
                     fileStream.Dispose();
                 }
+                // new cache file
                 else
                 {
                     // new file should have file header
